@@ -58,7 +58,7 @@ typedef struct {
 /**
  *  @struct threadpool
  *  @brief The threadpool struct
- *
+ *  @var num_threads_working threads currently working
  *  @var notify       Condition variable to notify worker threads.
  *  @var threads      Array containing worker threads ID.
  *  @var thread_count Number of threads
@@ -73,6 +73,9 @@ typedef struct {
 struct threadpool_t {
   pthread_mutex_t lock;
   pthread_cond_t notify;
+  int num_threads_working;
+  pthread_mutex_t  thcount_lock;       /* used for thread count etc */
+  pthread_cond_t  threads_all_idle;    /* signal to thpool_wait     */
   pthread_t *threads;
   threadpool_task_t *queue;
   int thread_count;
@@ -112,7 +115,7 @@ threadpool_t *threadpool_create(int thread_count, int queue_size, int flags)
     pool->queue_size = queue_size;
     pool->head = pool->tail = pool->count = 0;
     pool->shutdown = pool->started = 0;
-
+    pool->num_threads_working = 0;
     /* Allocate thread and task queue */
     pool->threads = (pthread_t *)malloc(sizeof(pthread_t) * thread_count);
     pool->queue = (threadpool_task_t *)malloc
@@ -121,10 +124,13 @@ threadpool_t *threadpool_create(int thread_count, int queue_size, int flags)
     /* Initialize mutex and conditional variable first */
     if((pthread_mutex_init(&(pool->lock), NULL) != 0) ||
        (pthread_cond_init(&(pool->notify), NULL) != 0) ||
+       (pthread_mutex_init(&(pool->thcount_lock), NULL)!=0) ||
+       (pthread_cond_init(&pool->threads_all_idle, NULL)!=0) ||
        (pool->threads == NULL) ||
        (pool->queue == NULL)) {
         goto err;
     }
+
 
     /* Start worker threads */
     for(i = 0; i < thread_count; i++) {
@@ -257,6 +263,9 @@ int threadpool_free(threadpool_t *pool)
         pthread_mutex_lock(&(pool->lock));
         pthread_mutex_destroy(&(pool->lock));
         pthread_cond_destroy(&(pool->notify));
+        pthread_mutex_lock(&(pool->thcount_lock));
+        pthread_mutex_destroy(&(pool->thcount_lock));
+        pthread_cond_destroy(&(pool->threads_all_idle));
     }
     free(pool);    
     return 0;
@@ -294,7 +303,19 @@ static void *threadpool_thread(void *threadpool)
         pthread_mutex_unlock(&(pool->lock));
 
         /* Get to work */
+        pthread_mutex_lock(&pool->thcount_lock);
+			pool->num_threads_working++;
+        pthread_mutex_unlock(&pool->thcount_lock);
+
         (*(task.function))(task.argument);
+
+        pthread_mutex_lock(&pool->thcount_lock);
+		pool->num_threads_working--;
+		if (!pool->num_threads_working) {
+			pthread_cond_signal(&pool->threads_all_idle);
+		}
+        pthread_mutex_unlock(&pool->thcount_lock);
+
     }
 
     pool->started--;
@@ -302,4 +323,12 @@ static void *threadpool_thread(void *threadpool)
     pthread_mutex_unlock(&(pool->lock));
     pthread_exit(NULL);
     return(NULL);
+}
+/* Wait until all tasks are finished */
+void threadpool_wait(threadpool_t *pool){
+	pthread_mutex_lock(&pool->thcount_lock);
+	while (pool->count || pool->num_threads_working) {
+		pthread_cond_wait(&pool->threads_all_idle, &pool->thcount_lock);
+	}
+	pthread_mutex_unlock(&pool->thcount_lock);
 }

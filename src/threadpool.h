@@ -93,6 +93,12 @@ int threadpool_add(threadpool_t *pool, void (*routine)(void *),
  * processes all pending tasks before shutdown.
  */
 int threadpool_destroy(threadpool_t *pool, int flags);
+/**
+ * @function threadpool_wait
+ * @brief Wait untill all the tasks are finished in the thread pool.
+ * @param pool  Thread pool.
+ */
+void threadpool_wait(threadpool_t *pool);
 
 #ifdef __cplusplus
 }

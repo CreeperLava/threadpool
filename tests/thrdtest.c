@@ -39,6 +39,7 @@ int main(int argc, char **argv)
     while((tasks / 2) > done) {
         usleep(10000);
     }
+    threadpool_wait(pool);
     assert(threadpool_destroy(pool, 0) == 0);
     fprintf(stderr, "Did %d tasks\n", done);
 
