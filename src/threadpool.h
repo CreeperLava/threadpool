@@ -40,8 +40,11 @@ extern "C" {
 * @file threadpool.h
 * @brief Threadpool Header File
 */
+    
+// structure for a multithreaded function's arguments
 typedef struct t_arguments {
-    int i, j;
+    double * res;
+	double a, b;
 } t_arguments;
 
 /**
@@ -52,7 +55,7 @@ typedef struct t_arguments {
 *  @var argument Argument to be passed to the function.
 */
 typedef struct threadpool_t {
-    t_arguments args[MAX_JOBS]; // array to store the multithreaded function's arguments
+    t_arguments args[MAX_JOBS]; // array to store arguments, so that there is no need for constant mallocs
     pthread_mutex_t pool_lock; // mutex for variable synchronization
     pthread_cond_t all_jobs_done; // signal sent when all the tasks are done
     pthread_cond_t new_job_received; // signal sent when a new task is added
