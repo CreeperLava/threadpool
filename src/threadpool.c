@@ -55,9 +55,9 @@ void threadpool_initialize() {
     if (global_threadpool == NULL) {
         if(threadpool_create() != NULL) { // create threadpool
             threadpool_persist();
-            mexPrintf("Threadpool started with %d threads and queue size of %d\n", MAX_THREADS, MAX_JOBS);
+            printf("Threadpool started with %d threads and queue size of %d\n", MAX_THREADS, MAX_JOBS);
         } else
-            mexPrintf("Error creating threadpool, multithreading disabled\n"); // print error ID
+            printf("Error creating threadpool, multithreading disabled\n"); // print error ID
     }
 }
 
@@ -69,7 +69,7 @@ int threadpool_create() {
 
     /* Initialize */
 	global_threadpool->shutdown = 0;
-    global_threadpool->head = global_threadpool->tail = 0;
+    	global_threadpool->head = global_threadpool->tail = 0;
 	global_threadpool->count_threads = global_threadpool->count_jobs = 0;
 
     /* Initialize mutex and conditional variable first */
