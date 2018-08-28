@@ -29,76 +29,100 @@
 #ifndef _THREADPOOL_H_
 #define _THREADPOOL_H_
 
+#define MAX_THREADS 8 // how many threads are used for parallelism
+#define MAX_JOBS 256  // how many jobs can be queued at max
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 /**
- * @file threadpool.h
- * @brief Threadpool Header File
- */
- 
- /**
- * Increase this constants at your own risk
- * Large values might slow down your system
- */
-#define MAX_THREADS 64
-#define MAX_QUEUE 65536
+* @file threadpool.h
+* @brief Threadpool Header File
+*/
+typedef struct t_arguments {
+    int i, j;
+} t_arguments;
 
-typedef struct threadpool_t threadpool_t;
+/**
+*  @struct threadpool_task
+*  @brief the work struct
+*
+*  @var function Pointer to the function that will perform the job.
+*  @var argument Argument to be passed to the function.
+*/
+typedef struct threadpool_t {
+    t_arguments args[MAX_JOBS]; // array to store the multithreaded function's arguments
+    pthread_mutex_t pool_lock; // mutex for variable synchronization
+    pthread_cond_t all_jobs_done; // signal sent when all the tasks are done
+    pthread_cond_t new_job_received; // signal sent when a new task is added
+    int head; // index of the first element in the queue
+    int tail; // index of the last element
+    int shutdown; // indicator used when the threadpool is shut down
+    int count_jobs; // number of tasks queued
+    int count_threads; // number of threads working
+    pthread_t threads[MAX_THREADS]; // array to store the POSIX threads
+} threadpool_t;
+
+/**
+*  @struct threadpool_task
+*  @brief the work struct
+*
+*  @var function Pointer to the function that will perform the job.
+*  @var argument Argument to be passed to the function.
+*/
+typedef struct {
+    void (*function)(void *);
+    void *argument;
+} threadpool_task_t;
 
 typedef enum {
-    threadpool_invalid        = -1,
-    threadpool_lock_failure   = -2,
-    threadpool_queue_full     = -3,
-    threadpool_shutdown       = -4,
+    threadpool_invalid = -1,
+    threadpool_lock_failure = -2,
+    threadpool_queue_full = -3,
+    threadpool_shutdown = -4,
     threadpool_thread_failure = -5
 } threadpool_error_t;
 
-typedef enum {
-    threadpool_graceful       = 1
-} threadpool_destroy_flags_t;
+/**
+* @function void *threadpool_thread(void *threadpool)
+* @brief the worker thread
+* @param threadpool the global_threadpool which own the thread
+*/
+static void *threadpool_thread(void *argument);
+
+int threadpool_free();
+int threadpool_create();
+int threadpool_destroy();
+void threadpool_persist();
 
 /**
- * @function threadpool_create
- * @brief Creates a threadpool_t object.
- * @param thread_count Number of worker threads.
- * @param queue_size   Size of the queue.
- * @param flags        Unused parameter.
- * @return a newly created thread pool or NULL
- */
-threadpool_t *threadpool_create(int thread_count, int queue_size, int flags);
+* @function threadpool_initialize
+* @brief Creates a threadpool_t object.
+*/
+void threadpool_initialize();
 
 /**
- * @function threadpool_add
- * @brief add a new task in the queue of a thread pool
- * @param pool     Thread pool to which add the task.
- * @param function Pointer to the function that will perform the task.
- * @param argument Argument to be passed to the function.
- * @param flags    Unused parameter.
- * @return 0 if all goes well, negative values in case of error (@see
- * threadpool_error_t for codes).
- */
-int threadpool_add(threadpool_t *pool, void (*routine)(void *),
-                   void *arg, int flags);
+* @function threadpool_add
+* @brief add a new task in the queue of a thread pool
+* @param function Pointer to the function that will perform the task.
+* @param argument Argument to be passed to the function.
+* @return 0 if all goes well, negative values in case of error (@see
+* threadpool_error_t for codes).
+*/
+int threadpool_add(void(*routine)(void *), void *arg);
 
 /**
- * @function threadpool_destroy
- * @brief Stops and destroys a thread pool.
- * @param pool  Thread pool to destroy.
- * @param flags Flags for shutdown
- *
- * Known values for flags are 0 (default) and threadpool_graceful in
- * which case the thread pool doesn't accept any new tasks but
- * processes all pending tasks before shutdown.
- */
-int threadpool_destroy(threadpool_t *pool, int flags);
+* @function threadpool_terminate
+* @brief Stops and destroys a thread pool.
+*/
+void threadpool_terminate();
+
 /**
- * @function threadpool_wait
- * @brief Wait untill all the tasks are finished in the thread pool.
- * @param pool  Thread pool.
- */
-void threadpool_wait(threadpool_t *pool);
+* @function threadpool_wait
+* @brief Wait until all the tasks are finished in the thread pool.
+*/
+void threadpool_wait();
 
 #ifdef __cplusplus
 }
