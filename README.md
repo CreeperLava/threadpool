@@ -17,8 +17,11 @@ General usage
 =====================================
 
 The threadpool is pretty simple and self explanatory to use.
+
 Call threadpool_initialize to... initialize the threadpool.
+
 Call threadpool_add to add a task to the threadpool. A task consists of a function and an argument. If you need more than one argument, use a structure.
+
 Call threadpool_terminate to terminate the threadpool. It will wait for all the tasks to be done, shutdown the threads and free the allocated memory.
  
 MATLAB MEX Usage
